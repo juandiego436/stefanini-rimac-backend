@@ -1,0 +1,75 @@
+# swagger.yaml
+openapi: 3.0.0
+info:
+  title: API Stefanini-Rimac
+  version: 1.0.0
+  description: API para fusionar datos de SWAPI y OpenWeather
+
+servers:
+  - url: https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stage}
+    description: Servidor de producción
+
+paths:
+  /fusionados:
+    get:
+      summary: Obtiene datos fusionados de SWAPI y OpenWeather
+      responses:
+        '200':
+          description: Datos fusionados obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FusedData'
+        '500':
+          description: Error interno del servidor
+
+components:
+  schemas:
+    FusedData:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID del personaje
+        name:
+          type: string
+          description: Nombre del personaje
+        height:
+          type: number
+          description: Altura en cm
+        mass:
+          type: number
+          description: Masa en kg
+        homeworld:
+          type: string
+          description: Planeta de origen
+        climate:
+          type: string
+          description: Clima del planeta
+        terrain:
+          type: string
+          description: Terreno del planeta
+        currentWeather:
+          $ref: '#/components/schemas/WeatherData'
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Fecha de última actualización
+
+    WeatherData:
+      type: object
+      properties:
+        temperature:
+          type: number
+          description: Temperatura en grados Celsius
+        condition:
+          type: string
+          description: Condición climática
+        humidity:
+          type: number
+          description: Humedad porcentual
+        windSpeed:
+          type: number
+          description: Velocidad del viento en m/s

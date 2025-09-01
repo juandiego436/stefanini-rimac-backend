@@ -1,0 +1,128 @@
+service: stefanini-rimac-backend
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  memorySize: 256
+  timeout: 30
+  stage: ${opt:stage, 'dev'}
+  environment:
+    CACHE_TABLE: ${self:service}-cache-${sls:stage}
+    HISTORY_TABLE: ${self:service}-history-${sls:stage}
+    CUSTOM_DATA_TABLE: ${self:service}-custom-${sls:stage}
+    OPENWEATHER_API_KEY: ${env:OPENWEATHER_API_KEY, ''}
+    JWT_SECRET: ${env:JWT_SECRET, ''}
+    STAGE: ${sls:stage}
+  
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - Fn::GetAtt: [CacheTable, Arn]
+        - Fn::GetAtt: [HistoryTable, Arn]
+        - Fn::GetAtt: [CustomDataTable, Arn]
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+      Resource:
+        - !Sub ${HistoryTable.Arn}/index/*
+
+functions:
+  getFusionados:
+    handler: dist/handlers/get-fusionados.handler
+    events:
+      - http:
+          path: /fusionados
+          method: get
+          cors: true
+  
+  postAlmacenar:
+    handler: dist/handlers/post-almacenar.handler
+    events:
+      - http:
+          path: /almacenar
+          method: post
+          cors: true
+  
+  getHistorial:
+    handler: dist/handlers/get-historial.handler
+    events:
+      - http:
+          path: /historial
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                limit: false
+                lastKey: false
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+  - serverless-plugin-typescript
+
+resources:
+  Resources:
+    CacheTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CACHE_TABLE}
+        AttributeDefinitions:
+          - AttributeName: cacheKey
+            AttributeType: S
+        KeySchema:
+          - AttributeName: cacheKey
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    HistoryTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.HISTORY_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: createdAt-index
+            KeySchema:
+              - AttributeName: createdAt
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    CustomDataTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CUSTOM_DATA_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    noPrependStageInUrl: true
+  dotenv:
+    path: .env.${self:provider.stage}
